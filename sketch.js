@@ -1,104 +1,95 @@
-let crashData;
-
-
-let clearCount = 0;
-let cloudyCount = 0;
-let rainCount = 0;
-let otherCount = 0;
+let table;
+let factors = [];
+let maxRows = 6000;
 
 function preload() {
-
-  crashData = loadTable("data.csv", "csv", "header");
+  table = loadTable("data.csv", "csv", "header");
 }
 
 function setup() {
-  createCanvas(700, 500);
-
-  let rows = crashData.getRowCount();
-
- 
-  for (let i = 0; i < rows; i++) {
-    let weather = crashData.getString(i, "WEATHER CONDITION");
-
-    if (!weather) {
-      otherCount++;
-    } else if (weather == "Clear") {
-      clearCount++;
-    } else if (weather == "Cloudy") {
-      cloudyCount++;
-    } else if (weather == "Rain") {
-      rainCount++;
-    } else {
-      otherCount++;
-    }
-  }
+  createCanvas(900, 600);
+  textFont("sans-serif");
+  processData();
 }
 
 function draw() {
-  background(240);
+  background(10, 14, 24);
+  drawTitle();
+  drawMandala();
+}
 
-  // Title
-  textAlign(CENTER);
-  textSize(24);
-  fill(0);
-  text("Crashes by Weather Condition", width / 2, 40);
+function processData() {
+  let mapFactor = {};
+  let rowCount = table.getRowCount();
+  let step = max(1, floor(rowCount / maxRows));
 
- 
-  let labels = ["Clear", "Cloudy", "Rain", "Other"];
-  let counts = [clearCount, cloudyCount, rainCount, otherCount];
-
- 
-  let maxCount = max(counts);
-
-
-  let marginLeft = 80;
-  let marginRight = 80;
-  let marginTop = 80;
-  let marginBottom = 80;
-
-  let chartWidth = width - marginLeft - marginRight;
-  let chartHeight = height - marginTop - marginBottom;
-
-  let barWidth = chartWidth / counts.length;
-
- 
-  stroke(0);
-  line(marginLeft, height - marginBottom, width - marginRight, height - marginBottom);
-  noStroke();
-
- 
-  for (let i = 0; i < counts.length; i++) {
-    let value = counts[i];
-
-   
-    let barHeight = map(value, 0, maxCount, 0, chartHeight);
-
-    let x = marginLeft + i * barWidth;
-    let y = height - marginBottom - barHeight;
-
-    
-    if (i == 0) fill(100, 200, 255);      
-    else if (i == 1) fill(160, 160, 220); 
-    else if (i == 2) fill(80, 120, 255);  
-    else fill(220, 140, 160);             
-
-    
-    rect(x + 10, y, barWidth - 20, barHeight);
-
-    
-    fill(0);
-    textSize(14);
-    text(labels[i], x + barWidth / 2, height - marginBottom + 20);
-
-    
-    text(value, x + barWidth / 2, y - 10);
+  for (let r = 0; r < rowCount; r += step) {
+    let factor = table.getString(r, "PRIMARY FACTOR");
+    if (!factor) factor = "Unknown";
+    let injury = int(table.get(r, "INJURY") || 0);
+    let fatal = int(table.get(r, "FATALITY") || 0);
+    let hitRun = int(table.get(r, "HIT AND RUN") || 0) > 0;
+    let severity = 0;
+    if (injury > 0) severity = 1;
+    if (fatal > 0) severity = 2;
+    if (!mapFactor[factor]) mapFactor[factor] = [];
+    mapFactor[factor].push({ severity, hitRun });
   }
 
-  
-  push();
-  translate(30, height / 2);
-  rotate(-HALF_PI);
-  textAlign(CENTER);
-  text("Number of Crashes", 0, 0);
-  pop();
+  for (let name in mapFactor) {
+    factors.push({ name, crashes: mapFactor[name] });
+  }
+
+  factors.sort((a, b) => b.crashes.length - a.crashes.length);
+  factors = factors.slice(0, 8);
+}
+
+function drawTitle() {
+  fill(240);
+  noStroke();
+  textSize(26);
+  textAlign(CENTER, TOP);
+  text("Crash Mandala", width / 2, 20);
+}
+
+function drawMandala() {
+  if (factors.length === 0) return;
+  let cx = width / 2;
+  let cy = height / 2 + 20;
+  let innerR = 40;
+  let outerR = min(width, height) * 0.42;
+  let ringCount = factors.length;
+
+  for (let i = 0; i < ringCount; i++) {
+    let f = factors[i];
+    let radius = map(i, 0, ringCount - 1, innerR, outerR);
+    stroke(60, 80, 120, 70);
+    strokeWeight(1);
+    noFill();
+    ellipse(cx, cy, radius * 2, radius * 2);
+
+    let n = f.crashes.length;
+    noStroke();
+    for (let j = 0; j < n; j++) {
+      let c = f.crashes[j];
+      let a = TWO_PI * (j / n);
+      let x = cx + cos(a) * radius;
+      let y = cy + sin(a) * radius;
+
+      if (c.severity === 0) fill(120, 200, 255);
+      else if (c.severity === 1) fill(255, 220, 120);
+      else fill(255, 90, 90);
+
+      let s = 4 + c.severity;
+      ellipse(x, y, s, s);
+
+      if (c.hitRun) {
+        noFill();
+        stroke(255, 100, 220);
+        strokeWeight(1);
+        ellipse(x, y, s + 3, s + 3);
+        noStroke();
+      }
+    }
+  }
 }
